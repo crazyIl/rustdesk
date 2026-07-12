@@ -265,6 +265,14 @@ fn create_capturer(
     _current: usize,
     _portable_service_running: bool,
 ) -> ResultType<Box<dyn TraitCapturer>> {
+    #[cfg(target_os = "macos")]
+    if privacy_mode_id > 0 {
+        return Ok(Box::new(
+            crate::platform::PrivacyCapturer::new(display)
+                .with_context(|| "Failed to create macOS privacy capturer")?,
+        ));
+    }
+
     #[cfg(not(windows))]
     let c: Option<Box<dyn TraitCapturer>> = None;
     #[cfg(windows)]
@@ -310,7 +318,7 @@ fn create_capturer(
     };
 }
 
-// This function works on privacy mode. Windows only for now.
+// This function verifies that the privacy-mode capture backend can start.
 pub fn test_create_capturer(
     privacy_mode_id: i32,
     display_idx: usize,

@@ -4685,7 +4685,8 @@ impl Connection {
                             self.inner.id,
                             self.display_idx,
                             5_000,
-                        );
+                        )
+                        .await;
                         if err_msg.is_empty() {
                             crate::common::make_privacy_mode_msg(
                                 back_notification::PrivacyModeState::PrvOnSucceeded,

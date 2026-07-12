@@ -5,7 +5,7 @@ use crate::{
     ipc::{connect, Data},
     platform::is_installed,
 };
-#[cfg(windows)]
+#[cfg(any(windows, target_os = "macos"))]
 use hbb_common::tokio;
 use hbb_common::{anyhow::anyhow, bail, lazy_static, tokio::sync::oneshot, ResultType};
 use serde_derive::{Deserialize, Serialize};
@@ -110,7 +110,11 @@ lazy_static::lazy_static! {
         {
             #[cfg(target_os = "macos")]
             {
-                macos::PRIVACY_MODE_IMPL.to_owned()
+                if macos::is_supported() {
+                    macos::PRIVACY_MODE_IMPL.to_owned()
+                } else {
+                    "".to_owned()
+                }
             }
             #[cfg(not(target_os = "macos"))]
             {
@@ -140,9 +144,11 @@ lazy_static::lazy_static! {
         let mut map: HashMap<&'static str, PrivacyModeCreator> = HashMap::new();
         #[cfg(target_os = "macos")]
         {
-            map.insert(macos::PRIVACY_MODE_IMPL, |impl_key: &str| {
-                Box::new(macos::PrivacyModeImpl::new(impl_key))
-            });
+            if macos::is_supported() {
+                map.insert(macos::PRIVACY_MODE_IMPL, |impl_key: &str| {
+                    Box::new(macos::PrivacyModeImpl::new(impl_key))
+                });
+            }
         }
         #[cfg(windows)]
         let mut map: HashMap<&'static str, PrivacyModeCreator> = HashMap::new();
@@ -351,10 +357,11 @@ pub fn get_supported_privacy_mode_impl() -> Vec<(&'static str, &'static str)> {
     }
     #[cfg(target_os = "macos")]
     {
-        // No translation is intended for privacy_mode_impl_macos_tip as it is a 
-        // placeholder for macOS specific privacy mode implementation which currently
-        // doesn't provide multiple modes like Windows does.
-        vec![(macos::PRIVACY_MODE_IMPL, "privacy_mode_impl_macos_tip")]
+        if macos::is_supported() {
+            vec![(macos::PRIVACY_MODE_IMPL, "privacy_mode_impl_macos_tip")]
+        } else {
+            Vec::new()
+        }
     }
     #[cfg(not(any(target_os = "windows", target_os = "macos")))]
     {
@@ -382,8 +389,8 @@ pub fn is_current_privacy_mode_impl(impl_key: &str) -> bool {
 }
 
 #[inline]
-#[cfg(not(windows))]
-pub fn check_privacy_mode_err(
+#[cfg(not(any(windows, target_os = "macos")))]
+pub async fn check_privacy_mode_err(
     _privacy_mode_id: i32,
     _display_idx: usize,
     _timeout_millis: u64,
@@ -392,18 +399,46 @@ pub fn check_privacy_mode_err(
 }
 
 #[inline]
+#[cfg(target_os = "macos")]
+pub async fn check_privacy_mode_err(
+    privacy_mode_id: i32,
+    display_idx: usize,
+    timeout_millis: u64,
+) -> String {
+    match test_create_capturer_async(privacy_mode_id, display_idx, timeout_millis).await {
+        Ok(error) => error,
+        Err(error) => format!("Failed to verify privacy capture: {error}"),
+    }
+}
+
+#[inline]
 #[cfg(windows)]
-pub fn check_privacy_mode_err(
+pub async fn check_privacy_mode_err(
     privacy_mode_id: i32,
     display_idx: usize,
     timeout_millis: u64,
 ) -> String {
     // win magnifier implementation requires a test of creating a capturer.
     if is_current_privacy_mode_impl(PRIVACY_MODE_IMPL_WIN_MAG) {
-        crate::video_service::test_create_capturer(privacy_mode_id, display_idx, timeout_millis)
+        match test_create_capturer_async(privacy_mode_id, display_idx, timeout_millis).await {
+            Ok(error) => error,
+            Err(error) => format!("Failed to verify privacy capture: {error}"),
+        }
     } else {
         "".to_owned()
     }
+}
+
+#[cfg(any(windows, target_os = "macos"))]
+async fn test_create_capturer_async(
+    privacy_mode_id: i32,
+    display_idx: usize,
+    timeout_millis: u64,
+) -> Result<String, tokio::task::JoinError> {
+    tokio::task::spawn_blocking(move || {
+        crate::video_service::test_create_capturer(privacy_mode_id, display_idx, timeout_millis)
+    })
+    .await
 }
 
 #[inline]

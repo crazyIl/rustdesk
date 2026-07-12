@@ -1,11 +1,16 @@
 use super::{PrivacyMode, PrivacyModeState};
-use hbb_common::{anyhow::anyhow, ResultType};
+use hbb_common::{anyhow::anyhow, log, ResultType};
 
 extern "C" {
     fn MacSetPrivacyMode(on: bool) -> bool;
+    fn MacPrivacyModeSupported() -> bool;
 }
 
 pub const PRIVACY_MODE_IMPL: &str = "privacy_mode_impl_macos";
+
+pub fn is_supported() -> bool {
+    unsafe { MacPrivacyModeSupported() }
+}
 
 pub struct PrivacyModeImpl {
     impl_key: String,
@@ -23,7 +28,7 @@ impl PrivacyModeImpl {
 
 impl PrivacyMode for PrivacyModeImpl {
     fn is_async_privacy_mode(&self) -> bool {
-        false
+        true
     }
 
     fn init(&self) -> ResultType<()> {
@@ -31,8 +36,8 @@ impl PrivacyMode for PrivacyModeImpl {
     }
 
     fn clear(&mut self) {
-        unsafe {
-            MacSetPrivacyMode(false);
+        if !unsafe { MacSetPrivacyMode(false) } {
+            log::error!("Failed to clear macOS privacy mode");
         }
         self.conn_id = 0;
     }
@@ -49,7 +54,11 @@ impl PrivacyMode for PrivacyModeImpl {
         Ok(true)
     }
 
-    fn turn_off_privacy(&mut self, conn_id: i32, _state: Option<PrivacyModeState>) -> ResultType<()> {
+    fn turn_off_privacy(
+        &mut self,
+        conn_id: i32,
+        _state: Option<PrivacyModeState>,
+    ) -> ResultType<()> {
         // Note: The `_state` parameter is intentionally ignored on macOS.
         // On Windows, it's used to notify the connection manager about privacy mode state changes
         // (see win_topmost_window.rs). macOS currently has a simpler single-mode implementation
@@ -74,8 +83,6 @@ impl PrivacyMode for PrivacyModeImpl {
 
 impl Drop for PrivacyModeImpl {
     fn drop(&mut self) {
-        // Use the same cleanup logic as other code paths to keep conn_id consistent
-        // and ensure all cleanup is centralized in one place.
         self.clear();
     }
 }

@@ -11,6 +11,7 @@ fn build_windows() {
 #[cfg(target_os = "macos")]
 fn build_mac() {
     let file = "src/platform/macos.mm";
+    let privacy_file = "src/platform/macos_privacy.mm";
     let mut b = cc::Build::new();
     if let Ok(os_version::OsVersion::MacOS(v)) = os_version::detect() {
         let v = v.version;
@@ -19,7 +20,14 @@ fn build_mac() {
         }
     }
     b.flag("-std=c++17").file(file).compile("macos");
+    cc::Build::new()
+        .flag("-std=c++17")
+        .flag("-fobjc-arc")
+        .file(privacy_file)
+        .compile("macos_privacy");
     println!("cargo:rerun-if-changed={}", file);
+    println!("cargo:rerun-if-changed={}", privacy_file);
+    println!("cargo:rerun-if-changed=src/platform/macos_privacy.h");
 }
 
 #[cfg(all(windows, feature = "inline"))]
@@ -89,6 +97,11 @@ fn main() {
         #[cfg(target_os = "macos")]
         build_mac();
         println!("cargo:rustc-link-lib=framework=ApplicationServices");
+        println!("cargo:rustc-link-lib=framework=AppKit");
+        println!("cargo:rustc-link-lib=framework=CoreMedia");
+        println!("cargo:rustc-link-lib=framework=CoreVideo");
+        println!("cargo:rustc-link-lib=framework=IOSurface");
+        println!("cargo:rustc-link-arg=-Wl,-weak_framework,ScreenCaptureKit");
     }
     println!("cargo:rerun-if-changed=build.rs");
 }

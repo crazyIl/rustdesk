@@ -1315,7 +1315,7 @@ pub async fn lock_screen() {
         });
     } else if #[cfg(target_os = "macos")] {
         // CGSession -suspend not real lock screen, it is user switch
-        std::thread::spawn(|| {
+        if let Err(err) = tokio::task::spawn_blocking(|| {
             let mut key_event = KeyEvent::new();
 
             key_event.set_chr('q' as _);
@@ -1327,7 +1327,9 @@ pub async fn lock_screen() {
             handle_key(&key_event);
             key_event.down = false;
             handle_key(&key_event);
-        });
+        }).await {
+            log::error!("Failed to execute macOS lock screen input: {err}");
+        }
     } else {
     crate::platform::lock_screen();
     }
