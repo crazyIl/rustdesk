@@ -47,6 +47,10 @@ use verified_dmg::{
     VerifiedDmg,
 };
 
+#[path = "macos_privacy.rs"]
+mod macos_privacy;
+pub use macos_privacy::PrivacyCapturer;
+
 // macOS boolean_t is defined as `int` in <mach/boolean.h>
 type BooleanT = hbb_common::libc::c_int;
 

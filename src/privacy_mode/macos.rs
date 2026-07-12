@@ -3,9 +3,14 @@ use hbb_common::{anyhow::anyhow, ResultType};
 
 extern "C" {
     fn MacSetPrivacyMode(on: bool) -> bool;
+    fn MacPrivacyModeSupported() -> bool;
 }
 
 pub const PRIVACY_MODE_IMPL: &str = "privacy_mode_impl_macos";
+
+pub fn is_supported() -> bool {
+    unsafe { MacPrivacyModeSupported() }
+}
 
 pub struct PrivacyModeImpl {
     impl_key: String,

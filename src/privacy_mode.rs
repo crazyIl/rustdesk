@@ -115,7 +115,11 @@ lazy_static::lazy_static! {
         {
             #[cfg(target_os = "macos")]
             {
-                macos::PRIVACY_MODE_IMPL.to_owned()
+                if macos::is_supported() {
+                    macos::PRIVACY_MODE_IMPL.to_owned()
+                } else {
+                    "".to_owned()
+                }
             }
             #[cfg(not(target_os = "macos"))]
             {
@@ -145,9 +149,11 @@ lazy_static::lazy_static! {
         let mut map: HashMap<&'static str, PrivacyModeCreator> = HashMap::new();
         #[cfg(target_os = "macos")]
         {
-            map.insert(macos::PRIVACY_MODE_IMPL, |impl_key: &str| {
-                Box::new(macos::PrivacyModeImpl::new(impl_key))
-            });
+            if macos::is_supported() {
+                map.insert(macos::PRIVACY_MODE_IMPL, |impl_key: &str| {
+                    Box::new(macos::PrivacyModeImpl::new(impl_key))
+                });
+            }
         }
         #[cfg(windows)]
         let mut map: HashMap<&'static str, PrivacyModeCreator> = HashMap::new();
@@ -410,13 +416,23 @@ pub fn is_current_privacy_mode_impl(impl_key: &str) -> bool {
 }
 
 #[inline]
-#[cfg(not(windows))]
+#[cfg(not(any(windows, target_os = "macos")))]
 pub fn check_privacy_mode_err(
     _privacy_mode_id: i32,
     _display_idx: usize,
     _timeout_millis: u64,
 ) -> String {
     "".to_owned()
+}
+
+#[inline]
+#[cfg(target_os = "macos")]
+pub fn check_privacy_mode_err(
+    privacy_mode_id: i32,
+    display_idx: usize,
+    timeout_millis: u64,
+) -> String {
+    crate::video_service::test_create_capturer(privacy_mode_id, display_idx, timeout_millis)
 }
 
 #[inline]

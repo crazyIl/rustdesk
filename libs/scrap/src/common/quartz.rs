@@ -81,6 +81,17 @@ pub struct PixelBuffer<'a> {
     height: usize,
 }
 
+impl<'a> PixelBuffer<'a> {
+    pub fn new(frame: quartz::Frame, width: usize, height: usize) -> Self {
+        Self {
+            frame,
+            data: PhantomData,
+            width,
+            height,
+        }
+    }
+}
+
 impl<'a> crate::TraitPixelBuffer for PixelBuffer<'a> {
     fn data(&self) -> &[u8] {
         &*self.frame
@@ -134,6 +145,10 @@ impl Display {
 
     pub fn name(&self) -> String {
         self.0.id().to_string()
+    }
+
+    pub fn id(&self) -> u32 {
+        self.0.id()
     }
 
     pub fn is_online(&self) -> bool {
